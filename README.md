@@ -28,7 +28,7 @@ Even without emulator integration, VTS is useful for:
 - [x] Protocol specification
 - [x] Basic daemon implementation
 - [x] Test client
-- [ ] Multi-source support
+- [x] Multi-source support
 - [ ] GUI preview client
 - [ ] WinUAE integration
 - [ ] Live capture support
@@ -64,6 +64,20 @@ vts-daemon
 
 # Or specify options
 vts-daemon --port 5400 --format ntsc --host 0.0.0.0
+```
+
+## Running Multiple Instances
+
+For setups requiring multiple video sources (e.g., Video Toaster configurations with sources A-D), run multiple daemon instances on different ports:
+
+```bash
+vts-daemon --port 5400 --name "Source A" --media ~/Videos/source-a
+vts-daemon --port 5401 --name "Source B" --media ~/Videos/source-b
+vts-daemon --port 5402 --name "Source C" --media ~/Videos/source-c
+vts-daemon --port 5403 --name "Source D" --media ~/Videos/source-d
+```
+
+The instance name appears in the server's HELLO response and in log messages, making it easier to identify which source is which when debugging or monitoring.
 ```
 
 ### Test Client

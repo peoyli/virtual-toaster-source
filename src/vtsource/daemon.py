@@ -29,37 +29,39 @@ class DaemonProtocol(asyncio.Protocol):
     to per-client sources).
     """
     
-    def __init__(self, source: VideoSource, media_root: Optional[Path] = None):
+    def __init__(self, source: VideoSource, media_root: Optional[Path] = None, name: str = 'VTS'):
         """
         Initialize protocol handler
-        
+
         Args:
             source: Shared video source instance
             media_root: Optional root directory for media files
+            name: Instance name (for identification in multi-source setups)
         """
         self.source = source
         self.media_root = media_root
+        self.name = name
         self.transport: Optional[asyncio.Transport] = None
         self.buffer = b''
         self.peername: str = "unknown"
-    
+
     def connection_made(self, transport: asyncio.Transport):
         """Called when client connects"""
         self.transport = transport
         self.peername = str(transport.get_extra_info('peername'))
         logger.info(f"Connection from {self.peername}")
-        self.send_line(f"{Response.HELLO} VTSource 0.1.0")
-    
+        self.send_line(f"{Response.HELLO} {self.name} VTSource/0.1.0")
+
     def connection_lost(self, exc: Optional[Exception]):
         """Called when client disconnects"""
         logger.info(f"Connection closed: {self.peername}")
         if exc:
             logger.debug(f"Connection error: {exc}")
-    
+
     def data_received(self, data: bytes):
         """Called when data received from client"""
         self.buffer += data
-        
+
         # Process complete lines
         while b'\n' in self.buffer:
             line, self.buffer = self.buffer.split(b'\n', 1)
@@ -380,6 +382,7 @@ async def run_daemon(
     port: int = 5400,
     video_format: VideoFormat = None,
     media_root: Path = None,
+    name: str = 'VTS',
 ):
     """
     Run the VTS daemon
@@ -389,6 +392,7 @@ async def run_daemon(
         port: Bind port
         video_format: Default output format
         media_root: Root directory for media files
+        name: Instance name (for identification in multi-source setups)
     """
     if video_format is None:
         video_format = VideoFormat.ntsc()
@@ -398,12 +402,12 @@ async def run_daemon(
     loop = asyncio.get_event_loop()
     
     server = await loop.create_server(
-        lambda: DaemonProtocol(source, media_root),
+        lambda: DaemonProtocol(source, media_root, name),
         host, port
     )
     
     addrs = ', '.join(str(sock.getsockname()) for sock in server.sockets)
-    logger.info(f"VTS Daemon listening on {addrs}")
+    logger.info(f"VTS Daemon '{name}' listening on {addrs}")
     logger.info(f"Default format: {video_format}")
     if media_root:
         logger.info(f"Media root: {media_root}")

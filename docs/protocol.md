@@ -12,6 +12,7 @@ for debugging while remaining efficient for programmatic use.
 
 - **Transport**: TCP
 - **Default Port**: 5400
+- **Default name**: VTS
 - **Encoding**: UTF-8 for commands, binary for frame data
 - **Line Terminator**: `\n` (LF)
 
@@ -19,7 +20,7 @@ for debugging while remaining efficient for programmatic use.
 
 ```
 Client connects
-Server: OK HELLO VTSource 0.1.0
+Server: OK HELLO VTS VTSource 0.1.0
 
 Client: FORMAT NTSC RGB24
 Server: OK FORMAT NTSC RGB24
@@ -43,7 +44,7 @@ Connection closed
 #### HELLO (implicit)
 Server sends on connection:
 ```
-OK HELLO VTSource <version>
+OK HELLO <name> VTSource <version>
 ```
 
 #### BYE
@@ -335,7 +336,7 @@ PAL:  720 × 576 × 1.5 = 622,080 bytes
 
 ```
 $ nc localhost 5400
-OK HELLO VTSource 0.1.0
+OK HELLO VTS VTSource 0.1.0
 FORMAT NTSC RGB24
 OK FORMAT NTSC RGB24
 LIST

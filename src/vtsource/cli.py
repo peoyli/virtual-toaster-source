@@ -51,6 +51,11 @@ Examples:
         help='Bind port (default: 5400)'
     )
     parser.add_argument(
+        '--name',
+        default='VTS',
+        help='Instance name (for identification in multi-source setups)'
+    )
+    parser.add_argument(
         '--format', 
         choices=['ntsc', 'pal'], 
         default='ntsc',
@@ -94,6 +99,7 @@ Examples:
             port=args.port,
             video_format=video_format,
             media_root=args.media,
+            name=args.name,
         ))
     except KeyboardInterrupt:
         print("\nDaemon stopped.")
