@@ -155,6 +155,9 @@ class DaemonProtocol(asyncio.Protocol):
             self.send_error(ErrorCode.INVALID_ARGUMENT, "Invalid frame number")
             return
         
+        if frame < 0:
+          frame = self.source.info.frame_count + frame
+
         if self.source.seek(frame):
             self.send_line(f"{Response.SEEKED} {self.source.current_frame}")
         else:
