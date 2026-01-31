@@ -107,6 +107,9 @@ class Command:
     STATUS = "STATUS"
     INFO = "INFO"
 
+    # Extended status
+    SOURCE = "SOURCE"
+    FRAMEINFO = "FRAMEINFO"
 
 class Response:
     """Protocol response definitions"""

@@ -87,6 +87,8 @@ class DaemonProtocol(asyncio.Protocol):
             Command.GETFRAME: self.cmd_getframe,
             Command.STATUS: self.cmd_status,
             Command.INFO: self.cmd_info,
+            Command.SOURCE: self.cmd_source,
+            Command.FRAMEINFO: self.cmd_frameinfo,
             Command.LOOP: self.cmd_loop,
             Command.FORMAT: self.cmd_format,
             Command.LIST: self.cmd_list,
@@ -227,6 +229,58 @@ class DaemonProtocol(asyncio.Protocol):
             )
         else:
             self.send_line("OK INFO none")
+
+    def cmd_source(self, args: list[str]):
+        """SOURCE - Get information about loaded source"""
+        if not self.source.is_loaded:
+            self.send_line("OK SOURCE NONE")
+            return
+
+        info = self.source.info
+        if not info:
+            self.send_line("OK SOURCE NONE")
+            return
+
+        filepath = info.filepath or "unknown"
+        self.send_line(
+            f'OK SOURCE "{filepath}" {info.frame_count} '
+            f'{info.width}x{info.height} {info.frame_rate:.2f} {info.codec}'
+        )
+
+    def cmd_frameinfo(self, args: list[str]):
+        """FRAMEINFO [frame] - Get frame metadata without pixel data"""
+        if not self.source.is_loaded:
+            self.send_error(ErrorCode.NOT_LOADED, "No file loaded")
+            return
+
+        # Parse frame number
+        if args:
+            try:
+                frame_num = int(args[0])
+            except ValueError:
+                self.send_error(ErrorCode.INVALID_ARGUMENT, f"Invalid frame number: {args[0]}")
+                return
+        else:
+            frame_num = self.source.current_frame
+
+        # Validate range
+        if frame_num < 0 or frame_num >= self.source.total_frames:
+            self.send_error(ErrorCode.INVALID_ARGUMENT, f"Frame out of range: {frame_num}")
+            return
+
+        # Get output format info
+        fmt = self.source.output_format
+        timestamp_ms = int(frame_num * fmt.frame_duration_ms)
+
+        # Flags
+        flags = FrameFlags.KEYFRAME if frame_num == 0 else FrameFlags.NONE
+        if frame_num == self.source.total_frames - 1:
+            flags |= FrameFlags.END_OF_STREAM
+
+        self.send_line(
+            f"OK FRAMEINFO {frame_num} {timestamp_ms} "
+            f"{fmt.width} {fmt.height} {fmt.colorspace.value} {flags}"
+        )
     
     def cmd_loop(self, args: list[str]):
         """LOOP [on|off] - Set loop mode"""

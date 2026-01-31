@@ -83,6 +83,21 @@ Errors:
 Server: ERROR 404 File not found: /nonexistent.mp4
 ```
 
+#### SOURCE
+Get information about the currently loaded video file.
+```
+Client: SOURCE
+Server: OK SOURCE "/path/to/video.mp4" 52710 720x486 29.97 h264
+```
+
+No file loaded:
+```
+Client: SOURCE
+Server: OK SOURCE NONE
+```
+
+Format: `OK SOURCE "<filepath>" <frames> <width>x<height> <fps> <codec>`
+
 ### Playback Control
 
 #### PLAY
@@ -154,6 +169,20 @@ The response consists of:
 1. Text line: `OK FRAMEDATA <size>`
 2. Binary header (16 bytes)
 3. Binary frame data (<size> bytes)
+
+#### FRAMEINFO [frame]
+Get metadata about a frame without transferring pixel data.
+```
+Client: FRAMEINFO
+Server: OK FRAMEINFO 0 0 720 486 0 1
+
+Client: FRAMEINFO 1000
+Server: OK FRAMEINFO 1000 33367 720 486 0 0
+```
+
+Format: `OK FRAMEINFO <frame> <timestamp_ms> <width> <height> <colorspace> <flags>`
+
+Useful for seeking/scanning without the overhead of full frame transfer.
 
 ### Configuration
 
