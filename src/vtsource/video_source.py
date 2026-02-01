@@ -114,11 +114,11 @@ class VideoSource:
     @state.setter
     def state(self, value: PlayState):
         self._state = value
-    
+
     @property
     def current_frame(self) -> int:
         return self._current_frame
-    
+
     @property
     def total_frames(self) -> int:
         return self._info.frame_count if self._info else 0
@@ -138,7 +138,11 @@ class VideoSource:
     @property
     def is_loaded(self) -> bool:
         return self._container is not None
-    
+
+    @property
+    def frame_duration_ms(self) -> float:
+        return 1000.0 / self._info.frame_rate
+
     def load(self, filepath: Path) -> bool:
         """
         Load a video file

@@ -44,6 +44,7 @@ class DaemonProtocol(asyncio.Protocol):
         self.transport: Optional[asyncio.Transport] = None
         self.buffer = b''
         self.peername: str = "unknown"
+        self._playback_task: Optional[asyncio.Task] = None
 
     def connection_made(self, transport: asyncio.Transport):
         """Called when client connects"""
@@ -120,43 +121,62 @@ class DaemonProtocol(asyncio.Protocol):
         if not filepath.exists():
             self.send_error(ErrorCode.FILE_NOT_FOUND, f"File not found: {filepath}")
             return
-        
+
         if self.source.load(filepath):
             self.send_line(f"{Response.LOADED} {self.source.total_frames} frames")
         else:
             self.send_error(ErrorCode.INTERNAL_ERROR, "Failed to load file")
-    
+
+    async def _playback_loop(self):
+        """Advance frames at the correct rate while playing"""
+        #frame_duration = 1.0 / self.source._info.frame_rate
+        frame_duration = self.source.frame_duration_ms / 1000
+
+        while self.source.state == PlayState.PLAYING:
+            await asyncio.sleep(frame_duration)
+            self.source.advance()
+
     def cmd_play(self, args: list[str]):
         """PLAY - Start playback"""
         if not self.source.is_loaded:
             self.send_error(ErrorCode.NOT_LOADED, "No file loaded")
             return
+        if self.source.state == PlayState.PLAYING:
+            self.send_line(Response.PLAYING)
+            return
+        self._playback_task = asyncio.create_task(self._playback_loop())
         self.source.state = PlayState.PLAYING
         self.send_line(Response.PLAYING)
-    
+
     def cmd_pause(self, args: list[str]):
         """PAUSE - Pause playback"""
         self.source.state = PlayState.PAUSED
+        if self._playback_task:
+            self._playback_task.cancel()
+            self._playback_task = None
         self.send_line(Response.PAUSED)
-    
+
     def cmd_stop(self, args: list[str]):
-        """STOP - Stop and return to beginning"""
+        """STOP - Stop playback and return to beginning"""
         self.source.state = PlayState.STOPPED
+        if self._playback_task:
+            self._playback_task.cancel()
+            self._playback_task = None
         self.source.seek(0)
         self.send_line(Response.STOPPED)
-    
+
     def cmd_seek(self, args: list[str]):
         """SEEK <frame> - Seek to frame number"""
         if not args:
             self.send_error(ErrorCode.INVALID_ARGUMENT, "SEEK requires frame number")
             return
-        
+
         try:
             frame = int(args[0])
         except ValueError:
             self.send_error(ErrorCode.INVALID_ARGUMENT, "Invalid frame number")
             return
-        
+
         if frame < 0:
           frame = self.source.info.frame_count + frame
 
