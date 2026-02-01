@@ -122,6 +122,57 @@ Client: STOP
 Server: OK STOPPED
 ```
 
+#### STREAM [on|off]
+Enable or disable continuous frame streaming while in PLAYING state.
+
+Query:
+```
+Client: STREAM
+Server: OK STREAM OFF
+```
+
+Enable:
+```
+Client: STREAM on
+Server: OK STREAM ON
+```
+
+Disable:
+```
+Client: STREAM off
+Server: OK STREAM OFF
+```
+
+When streaming is ON and state is PLAYING, the daemon automatically sends frames at the video's native frame rate. Each frame is sent as:
+
+```
+OK FRAMEDATA <size>
+[16-byte header][frame data]
+```
+
+Same format as GETFRAME response, but pushed without request.
+
+Notifications during streaming:
+- `OK END` - Playback reached end (when LOOP is OFF)
+- `OK LOOP 0` - Playback looped back to frame 0 (when LOOP is ON)
+
+When PAUSED or STOPPED, no frames are pushed (even if STREAM is ON).
+
+Client can still use GETFRAME, SEEK, etc. while streaming is ON.
+
+**Bandwidth requirements:**
+
+| Format | Colorspace | Frame Size | Bandwidth @ 30fps |
+|--------|------------|------------|-------------------|
+| NTSC   | RGB24      | 1,049,760  | ~31 MB/s          |
+| NTSC   | YUV422     | 699,840    | ~21 MB/s          |
+| NTSC   | YUV420P    | 524,880    | ~16 MB/s          |
+| PAL    | RGB24      | 1,244,160  | ~31 MB/s          |
+| PAL    | YUV422     | 829,440    | ~21 MB/s          |
+| PAL    | YUV420P    | 622,080    | ~16 MB/s          |
+
+For local or LAN use, this is acceptable. Future protocol versions may add compression.
+
 ### Navigation
 
 #### SEEK <frame>
@@ -359,6 +410,21 @@ BYE
 OK BYE
 ```
 
+### Streaming Session
+```
+$ nc localhost 5400
+OK HELLO VTS VTSource 0.1.0
+LOAD test_pattern.mp4
+OK LOADED 300 frames
+FORMAT NTSC YUV422
+OK FORMAT NTSC YUV422
+STREAM on
+OK STREAM ON
+PLAY
+OK PLAYING
+[frames are now pushed automatically at ~30fps]
+```
+
 ## Implementation Notes
 
 ### Buffering
@@ -374,14 +440,23 @@ After sending `GETFRAME`, the client must:
 3. Read exactly 16 bytes (header)
 4. Read exactly `<size>` bytes (frame data)
 
-### Timing
-
-The daemon does not automatically push frames during PLAY state.
-Clients must poll with GETFRAME or implement their own timing.
-Future protocol versions may add streaming modes.
-
 ### Concurrency
 
 Current implementation uses a single shared video source.
 Multiple clients will see the same video state.
 Future versions may support per-client sources.
+
+### Bandwidth Requirements
+
+When using STREAM mode, bandwidth requirements are significant:
+
+| Format | Colorspace | Frame Size | Bandwidth @ 30fps |
+|--------|------------|------------|-------------------|
+| NTSC   | RGB24      | 1,049,760  | ~31 MB/s          |
+| NTSC   | YUV422     | 699,840    | ~21 MB/s          |
+| NTSC   | YUV420P    | 524,880    | ~16 MB/s          |
+| PAL    | RGB24      | 1,244,160  | ~31 MB/s          |
+| PAL    | YUV422     | 829,440    | ~21 MB/s          |
+| PAL    | YUV420P    | 622,080    | ~16 MB/s          |
+
+For local or LAN use, this is acceptable. Future protocol versions may add compression.

@@ -45,6 +45,7 @@ class DaemonProtocol(asyncio.Protocol):
         self.buffer = b''
         self.peername: str = "unknown"
         self._playback_task: Optional[asyncio.Task] = None
+        self._streaming = False  # NEW: streaming mode flag
 
     def connection_made(self, transport: asyncio.Transport):
         """Called when client connects"""
@@ -58,6 +59,10 @@ class DaemonProtocol(asyncio.Protocol):
         logger.info(f"Connection closed: {self.peername}")
         if exc:
             logger.debug(f"Connection error: {exc}")
+        # Clean up streaming task
+        if self._playback_task:
+            self._playback_task.cancel()
+            self._playback_task = None
 
     def data_received(self, data: bytes):
         """Called when data received from client"""
@@ -96,6 +101,7 @@ class DaemonProtocol(asyncio.Protocol):
             Command.FORMAT: self.cmd_format,
             Command.LIST: self.cmd_list,
             Command.BYE: self.cmd_bye,
+            Command.STREAM: self.cmd_stream,  # NEW
         }
         
         handler = handlers.get(cmd)
@@ -128,13 +134,54 @@ class DaemonProtocol(asyncio.Protocol):
             self.send_error(ErrorCode.INTERNAL_ERROR, "Failed to load file")
 
     async def _playback_loop(self):
-        """Advance frames at the correct rate while playing"""
-        #frame_duration = 1.0 / self.source._info.frame_rate
+        """Advance frames at the correct rate while playing, optionally streaming"""
         frame_duration = self.source.frame_duration_ms / 1000
 
-        while self.source.state == PlayState.PLAYING:
-            await asyncio.sleep(frame_duration)
-            self.source.advance()
+        try:
+            while self.source.state == PlayState.PLAYING:
+                # Send frame if streaming is enabled
+                if self._streaming:
+                    self._send_current_frame()
+                
+                await asyncio.sleep(frame_duration)
+                
+                # Advance to next frame
+                if not self.source.advance():
+                    # End of video
+                    if self.source.loop:
+                        # Loop notification already handled by advance() seeking to 0
+                        if self._streaming:
+                            self.send_line(f"{Response.LOOPED} 0")
+                    else:
+                        if self._streaming:
+                            self.send_line(Response.END)
+                        self.source.state = PlayState.STOPPED
+                        break
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._playback_task = None
+
+    def cmd_stream(self, args: list[str]):
+        """STREAM [on|off] - Enable/disable frame streaming during playback"""
+        if not args:
+            # Query current state
+            state = "ON" if self._streaming else "OFF"
+            self.send_line(f"{Response.STREAM} {state}")
+            return
+        
+        arg = args[0].upper()
+        if arg in ('ON', 'TRUE', '1', 'YES'):
+            self._streaming = True
+            self.send_line(f"{Response.STREAM} ON")
+            # If already playing, start the playback task if not running
+            if self.source.state == PlayState.PLAYING and not self._playback_task:
+                self._playback_task = asyncio.create_task(self._playback_loop())
+        elif arg in ('OFF', 'FALSE', '0', 'NO'):
+            self._streaming = False
+            self.send_line(f"{Response.STREAM} OFF")
+        else:
+            self.send_error(ErrorCode.INVALID_ARGUMENT, "STREAM requires ON or OFF")
 
     def cmd_play(self, args: list[str]):
         """PLAY - Start playback"""
@@ -144,8 +191,8 @@ class DaemonProtocol(asyncio.Protocol):
         if self.source.state == PlayState.PLAYING:
             self.send_line(Response.PLAYING)
             return
-        self._playback_task = asyncio.create_task(self._playback_loop())
         self.source.state = PlayState.PLAYING
+        self._playback_task = asyncio.create_task(self._playback_loop())
         self.send_line(Response.PLAYING)
 
     def cmd_pause(self, args: list[str]):
@@ -178,7 +225,7 @@ class DaemonProtocol(asyncio.Protocol):
             return
 
         if frame < 0:
-          frame = self.source.info.frame_count + frame
+            frame = self.source.info.frame_count + frame
 
         if self.source.seek(frame):
             self.send_line(f"{Response.SEEKED} {self.source.current_frame}")
@@ -199,20 +246,11 @@ class DaemonProtocol(asyncio.Protocol):
         else:
             self.send_line("OK START")
     
-    def cmd_getframe(self, args: list[str]):
-        """GETFRAME [frame] - Get frame data"""
-        frame_num = None
-        if args:
-            try:
-                frame_num = int(args[0])
-            except ValueError:
-                self.send_error(ErrorCode.INVALID_ARGUMENT, "Invalid frame number")
-                return
-        
-        frame_data = self.source.get_frame(frame_num)
+    def _send_current_frame(self):
+        """Send current frame data (shared by GETFRAME and streaming)"""
+        frame_data = self.source.get_frame()
         
         if frame_data is None:
-            self.send_error(ErrorCode.INTERNAL_ERROR, "Frame not available")
             return
         
         # Prepare header
@@ -234,6 +272,25 @@ class DaemonProtocol(asyncio.Protocol):
         # Send binary header + data
         self.transport.write(header.pack())
         self.transport.write(frame_bytes)
+    
+    def cmd_getframe(self, args: list[str]):
+        """GETFRAME [frame] - Get frame data"""
+        if not self.source.is_loaded:
+            self.send_error(ErrorCode.NOT_LOADED, "No file loaded")
+            return
+        
+        frame_num = None
+        if args:
+            try:
+                frame_num = int(args[0])
+            except ValueError:
+                self.send_error(ErrorCode.INVALID_ARGUMENT, "Invalid frame number")
+                return
+        
+        if frame_num is not None:
+            self.source.seek(frame_num)
+        
+        self._send_current_frame()
     
     def cmd_status(self, args: list[str]):
         """STATUS - Get current status"""

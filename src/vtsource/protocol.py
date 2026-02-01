@@ -90,6 +90,7 @@ class Command:
     PLAY = "PLAY"
     PAUSE = "PAUSE"
     STOP = "STOP"
+    STREAM = "STREAM"
     
     # Navigation
     SEEK = "SEEK"
@@ -124,6 +125,9 @@ class Response:
     PLAYING = "OK PLAYING"
     PAUSED = "OK PAUSED"
     STOPPED = "OK STOPPED"
+    STREAM = "OK STREAM"
+    END = "OK END"
+    LOOPED = "OK LOOP"
     SEEKED = "OK SEEKED"
     FRAMEDATA = "OK FRAMEDATA"
     STATUS = "OK STATUS"
