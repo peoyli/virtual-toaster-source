@@ -1,7 +1,7 @@
 """Tests for protocol handling"""
 
 import pytest
-from vtsource.protocol import (
+from vtsd.protocol import (
     FrameHeader, FrameFlags, Command, Response, ErrorCode,
     parse_command, format_error, format_status
 )

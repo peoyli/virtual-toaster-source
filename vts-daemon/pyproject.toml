@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "virtual-toaster-source"
-version = "0.1.0"
+name = "vts-daemon"
+version = "0.2.0"
 description = "Video source daemon for Video Toaster emulation"
 readme = "README.md"
 license = {text = "MIT"}
@@ -47,12 +47,12 @@ capture = [
 ]
 
 [project.scripts]
-vts-daemon = "vtsource.cli:main_daemon"
-vts-test-client = "vtsource.cli:main_test_client"
+vtsd = "vtsd.cli:main_daemon"
+vts-test-client = "vtsd.cli:main_test_client"
 
 [project.urls]
 Homepage = "https://github.com/peoyli/virtual-toaster-source"
-Documentation = "https://github.com/peoyli/virtual-toaster-source/docs"
+Documentation = "https://github.com/peoyli/virtual-toaster-source/vts-daemon/docs"
 Repository = "https://github.com/peoyli/virtual-toaster-source"
 Issues = "https://github.com/peoyli/virtual-toaster-source/issues"
 

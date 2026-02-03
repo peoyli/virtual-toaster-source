@@ -2,7 +2,7 @@
 
 import pytest
 import numpy as np
-from vtsource.colorspace import (
+from vtsd.colorspace import (
     rgb24_to_yuv444,
     rgb24_to_yuv422_uyvy,
     rgb24_to_yuv420p,

@@ -1,7 +1,7 @@
 """Tests for video format specifications"""
 
 import pytest
-from vtsource.formats import VideoFormat, ColorSpace, VideoStandard
+from vtsd.formats import VideoFormat, ColorSpace, VideoStandard
 
 
 class TestVideoFormat:
